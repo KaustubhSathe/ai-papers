@@ -247,7 +247,26 @@ def main(config):
             print(f"Resuming training from Epoch {start_epoch + 1}, Step {start_step + 1}")
             checkpoint_loaded = True
         else:
-            print(f"Checkpoint files not found for resume='{config.resume}'. Starting training from scratch.")
+            # --- Improved Error Message ---
+            expected_files = {
+                "Encoder": encoder_path,
+                "Decoder": decoder_path,
+                "Optimizer": optimizer_path
+            }
+            missing = []
+            if not encoder_path or not os.path.exists(encoder_path):
+                missing.append(f"Encoder ({expected_files.get('Encoder', 'N/A')})")
+            if not decoder_path or not os.path.exists(decoder_path):
+                missing.append(f"Decoder ({expected_files.get('Decoder', 'N/A')})")
+            if not optimizer_path or not os.path.exists(optimizer_path):
+                missing.append(f"Optimizer ({expected_files.get('Optimizer', 'N/A')})")
+
+            if missing:
+                print(f"Checkpoint file(s) not found when trying to resume from '{config.resume}'. Missing: {', '.join(missing)}. Starting training from scratch.")
+            else:
+                 # This case should ideally not be reached if paths were derived but os.path.exists failed, but added for safety
+                 print(f"Could not load checkpoint for resume='{config.resume}' due to an unknown issue with path checks. Starting training from scratch.")
+            # --- End Improved Error Message ---
     else:
         print("No resume flag provided. Starting training from scratch.")
     # --- End Checkpoint Resuming Logic ---
