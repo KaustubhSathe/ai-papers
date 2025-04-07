@@ -105,13 +105,23 @@ class DecoderRNN(nn.Module):
         # Initialize
         k = beam_width
         completed_beams = [] # List to store completed sequences [(score, sequence)]
-        active_beams = [(0.0, [start_idx], None)] # List to store active beams [(log_prob_score, sequence, lstm_state)]
+        #active_beams = [(0.0, [start_idx], None)] # Old initialization
 
-        # Start with image features
-        inputs = features.unsqueeze(1) # (1, 1, embed_size)
+        # --- Corrected Initialization: Process features first ---
+        # Reshape features to be Batch_Size=1, Seq_Len=1, Embed_Size for LSTM
+        lstm_input = features.unsqueeze(1) # (1, 1, embed_size)
+        # Get initial LSTM state from image features
+        _, initial_states = self.lstm(lstm_input, None) # Run LSTM once with features
+
+        # Initialize beams with <start> token and the initial state from features
+        active_beams = [(0.0, [start_idx], initial_states)] # [(log_prob_score, sequence, lstm_state)]
+        # --- End Corrected Initialization ---
+
+        # Start with image features - No longer needed here
+        # inputs = features.unsqueeze(1) # (1, 1, embed_size)
 
         # Run beam search step by step
-        for _ in range(self.max_seg_length):
+        for _ in range(self.max_seg_length - 1): # Adjusted loop range as first step (<start>) is implicit now
             next_beam_candidates = []
 
             # Check if we have enough completed beams
