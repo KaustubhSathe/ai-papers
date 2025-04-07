@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from torch.nn.utils.rnn import pack_padded_sequence
-import torch.nn.functional as F # Needed for log_softmax
-import heapq # Needed for beam search priority queue
 
 class EncoderCNN(nn.Module):
     """
@@ -88,94 +86,3 @@ class DecoderRNN(nn.Module):
             #    break
         sampled_ids = torch.stack(sampled_ids, 1)                # sampled_ids: (1, max_seq_length)
         return sampled_ids
-
-    # --- Added Beam Search Method ---
-    def beam_search_sample(self, features, vocab, beam_width=5):
-        """Generate captions for given image features using beam search."""
-        # Get device from features
-        device = features.device
-        batch_size = features.size(0)
-        if batch_size != 1:
-            raise ValueError("Beam search currently supports batch_size=1 only.")
-
-        # Get special token indices
-        start_idx = vocab(vocab.word2idx['<start>'])
-        end_idx = vocab(vocab.word2idx['<end>'])
-
-        # Initialize
-        k = beam_width
-        completed_beams = [] # List to store completed sequences [(score, sequence)]
-        #active_beams = [(0.0, [start_idx], None)] # Old initialization
-
-        # --- Corrected Initialization: Process features first ---
-        # Reshape features to be Batch_Size=1, Seq_Len=1, Embed_Size for LSTM
-        lstm_input = features.unsqueeze(1) # (1, 1, embed_size)
-        # Get initial LSTM state from image features
-        _, initial_states = self.lstm(lstm_input, None) # Run LSTM once with features
-
-        # Initialize beams with <start> token and the initial state from features
-        active_beams = [(0.0, [start_idx], initial_states)] # [(log_prob_score, sequence, lstm_state)]
-        # --- End Corrected Initialization ---
-
-        # Start with image features - No longer needed here
-        # inputs = features.unsqueeze(1) # (1, 1, embed_size)
-
-        # Run beam search step by step
-        for _ in range(self.max_seg_length - 1): # Adjusted loop range as first step (<start>) is implicit now
-            next_beam_candidates = []
-
-            # Check if we have enough completed beams
-            if len(completed_beams) >= k:
-                break
-
-            new_active_beams = []
-            for log_prob, seq, current_states in active_beams:
-                last_word_idx = seq[-1]
-
-                # If the last word is <end>, add to completed and continue
-                if last_word_idx == end_idx:
-                    completed_beams.append((log_prob, seq))
-                    # Prune completed beams if exceeding k (keep top k)
-                    if len(completed_beams) > k:
-                         completed_beams = heapq.nlargest(k, completed_beams, key=lambda item: item[0])
-                    continue # Don't expand completed sequences
-                
-                # Prepare input for LSTM step
-                current_input_word = torch.tensor([last_word_idx], dtype=torch.long).to(device)
-                lstm_input = self.embed(current_input_word).unsqueeze(1) # (1, 1, embed_size)
-
-                # LSTM forward step
-                hiddens, next_states = self.lstm(lstm_input, current_states) # hiddens: (1, 1, hidden_size)
-                outputs = self.linear(hiddens.squeeze(1)) # outputs: (1, vocab_size)
-                log_probs = F.log_softmax(outputs, dim=1) # (1, vocab_size)
-
-                # Get top k candidates for the next word
-                top_log_probs, top_indices = log_probs.topk(k, dim=1) # (1, k), (1, k)
-
-                # Add new candidates to consider
-                for i in range(k):
-                    next_word_idx = top_indices[0, i].item()
-                    next_log_prob = top_log_probs[0, i].item()
-                    new_score = log_prob + next_log_prob
-                    new_seq = seq + [next_word_idx]
-                    next_beam_candidates.append((new_score, new_seq, next_states))
-
-            # If no candidates generated, break (shouldn't happen normally)
-            if not next_beam_candidates:
-                 break
-
-            # Keep the top k overall candidates from all expanded beams
-            active_beams = heapq.nlargest(k - len(completed_beams), next_beam_candidates, key=lambda item: item[0]) # Keep k beams total (active + completed)
-
-        # If no beams completed, use the best active beam
-        if not completed_beams:
-             completed_beams = [(score, seq) for score, seq, _ in active_beams]
-
-        # Sort completed beams by score (highest first)
-        completed_beams.sort(key=lambda item: item[0], reverse=True)
-
-        # Return the sequence of the best beam (highest score)
-        best_score, best_seq = completed_beams[0]
-        #print(f"Beam Search Best Score: {best_score}") # Optional: print score
-        return best_seq
-    # --- End Beam Search Method ---

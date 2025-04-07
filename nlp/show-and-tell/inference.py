@@ -21,8 +21,8 @@ def load_image(image_path, transform=None):
         image = transform(image).unsqueeze(0) # Add batch dimension
     return image
 
-def generate_caption(encoder, decoder, image_tensor, vocab, beam_width, max_length=50):
-    """Generate a caption for an image using the decoder's beam search sample method."""
+def generate_caption(encoder, decoder, image_tensor, vocab, max_length=50):
+    """Generate a caption for an image using the decoder's sample method."""
     encoder.eval()  # Set encoder to evaluation mode
     decoder.eval()  # Set decoder to evaluation mode
 
@@ -31,16 +31,25 @@ def generate_caption(encoder, decoder, image_tensor, vocab, beam_width, max_leng
     with torch.no_grad(): # Inference doesn't need gradients
         features = encoder(image_tensor) # (1, embed_size)
 
-        # --- Use decoder.beam_search_sample method --- 
-        if hasattr(decoder, 'beam_search_sample') and callable(getattr(decoder, 'beam_search_sample')):
-            # Pass features, vocab, and beam_width
-            # Note: The beam_search_sample method in model.py returns a list of indices
-            sampled_ids = decoder.beam_search_sample(features, vocab, beam_width=beam_width)
+        # --- Use decoder.sample method --- 
+        # The sample method handles the generation loop internally
+        # Ensure the sample method exists and handles potential <end> token index
+        if hasattr(decoder, 'sample') and callable(getattr(decoder, 'sample')):
+            # Pass features (expected shape typically (1, embed_size))
+            sampled_ids_tensor = decoder.sample(features) # Returns tensor shape (1, sequence_length)
+            
+            # Check if the output is a tensor and flatten if necessary
+            if isinstance(sampled_ids_tensor, torch.Tensor):
+                 sampled_ids = sampled_ids_tensor.cpu().numpy().flatten().tolist()
+            else:
+                 # Handle cases where sample might return list or other types directly (less common)
+                 print("Warning: decoder.sample did not return a tensor. Attempting to process directly.")
+                 sampled_ids = list(sampled_ids_tensor)
 
         else:
-             print("Error: Decoder object does not have a 'beam_search_sample' method. Cannot generate caption.")
-             return "[Error: beam_search_sample method missing in DecoderRNN]"
-        # --- End Use decoder.beam_search_sample method ---
+             print("Error: Decoder object does not have a 'sample' method. Cannot generate caption.")
+             return "[Error: sample method missing in DecoderRNN]"
+        # --- End Use decoder.sample method ---
 
 
     # Convert indices to words
@@ -127,8 +136,8 @@ def main(args):
         return
 
     # Generate the caption
-    print(f"\nGenerating caption for: {args.image_path} (Beam Width: {args.beam_width})")
-    caption = generate_caption(encoder, decoder, image_tensor, vocab, args.beam_width, args.max_length)
+    print(f"\nGenerating caption for: {args.image_path}")
+    caption = generate_caption(encoder, decoder, image_tensor, vocab, args.max_length)
 
     # --- Output ---
     print("\nGenerated Caption:")
@@ -153,7 +162,6 @@ if __name__ == '__main__':
 
     # Generation arguments
     parser.add_argument('--max_length', type=int, default=50, help='Maximum length of the generated caption.')
-    parser.add_argument('--beam_width', type=int, default=5, help='Beam width for beam search decoding.')
 
     args = parser.parse_args()
 
