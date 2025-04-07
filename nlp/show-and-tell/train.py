@@ -189,7 +189,7 @@ def main(config):
             # --- Added Log at every step ---
             step = i + 1 # Use step consistently (starts from 1)
             # Basic log at every single step
-            # print(f'E[{epoch+1}/{config.num_epochs}] S[{step}/{total_steps}] Loss: {loss.item():.4f}') # Optional: Comment out if too verbose
+            print(f'E[{epoch+1}/{config.num_epochs}] S[{step}/{total_steps}] Loss: {loss.item():.4f}') # Optional: Comment out if too verbose
             # --- End Added Log ---
 
 
