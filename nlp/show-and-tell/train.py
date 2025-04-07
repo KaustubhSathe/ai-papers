@@ -196,22 +196,38 @@ def main(config):
             print("Attempting to resume from the latest checkpoint...")
             encoder_path, decoder_path, optimizer_path, loaded_epoch, loaded_step = find_latest_checkpoint(config.model_path)
         else:
-            # Assume config.resume is a path prefix like 'models/encoder-1-1000'
-            base_path = config.resume.replace('encoder-', '').replace('.ckpt', '') # Get base name e.g., models/1-1000
-            encoder_path = f"{base_path}.ckpt"
-            decoder_path = encoder_path.replace('encoder-', 'decoder-')
-            optimizer_path = encoder_path.replace('encoder-', 'optimizer-')
-            print(f"Attempting to resume from specified checkpoint prefix: {config.resume}")
-            # Extract epoch and step from filename if possible
-            match = re.search(r'-(\d+)-(\d+)$', base_path)
+            # --- Corrected logic for specific path ---
+            print(f"Attempting to resume from specified checkpoint path: {config.resume}")
+            # Assume the provided path is one of the components (e.g., encoder)
+            # Derive the others by replacing the prefix in the original path.
+            if 'encoder-' in config.resume:
+                encoder_path = config.resume
+                decoder_path = config.resume.replace('encoder-', 'decoder-', 1)
+                optimizer_path = config.resume.replace('encoder-', 'optimizer-', 1)
+            elif 'decoder-' in config.resume:
+                decoder_path = config.resume
+                encoder_path = config.resume.replace('decoder-', 'encoder-', 1)
+                optimizer_path = config.resume.replace('decoder-', 'optimizer-', 1)
+            elif 'optimizer-' in config.resume:
+                optimizer_path = config.resume
+                encoder_path = config.resume.replace('optimizer-', 'encoder-', 1)
+                decoder_path = config.resume.replace('optimizer-', 'decoder-', 1)
+            else:
+                print(f"Error: Could not determine checkpoint type from path: {config.resume}")
+                encoder_path, decoder_path, optimizer_path = None, None, None
+
+            # Extract epoch and step from the filename part of the provided path
+            filename = os.path.basename(config.resume) # e.g., encoder-3-1000.ckpt
+            match = re.search(r'-(\d+)-(\d+)\.ckpt$', filename)
             if match:
                 loaded_epoch = int(match.group(1))
                 loaded_step = int(match.group(2))
                 print(f"Parsed Epoch: {loaded_epoch}, Step: {loaded_step} from path.")
             else:
-                print("Warning: Could not parse epoch/step from specified path. Resuming from epoch 0, step 0.")
+                print(f"Warning: Could not parse epoch/step from filename: {filename}. Resuming from epoch 0, step 0.")
                 loaded_epoch = 0
                 loaded_step = 0
+            # --- End Corrected logic ---
 
 
         if encoder_path and decoder_path and optimizer_path and os.path.exists(encoder_path) and os.path.exists(decoder_path) and os.path.exists(optimizer_path):
