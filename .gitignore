@@ -10,7 +10,7 @@
 
 
 ./show-and-tell/train2017/
-./show-and-tell/annotations_trainval2017/
+./show-and-tell/annotations/
 *.pyc
 *.pyo
 *.pyd
@@ -25,3 +25,11 @@
 *.pth.tar.gz
 *.pth.tar.gz.part
 *.pth.tar.gz.part.
+
+*.ckpt
+*.pth
+*.pt
+*.pkl
+*.json
+*.csv
+*.txt

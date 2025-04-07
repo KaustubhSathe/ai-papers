@@ -171,7 +171,7 @@ if __name__ == '__main__':
     # Example Usage Parameters (replace with your actual paths/settings)
     vocab_path = './vocab.pkl'
     coco_root = './train2017/train2017' # Directory containing COCO training images
-    annotations_path = './annotations_trainval2017/annotations/captions_train2017.json'
+    annotations_path = './annotations/captions_train2017.json'
     batch_size = 4 # Small batch for testing
 
     # Define a transform (should match the one in train.py)

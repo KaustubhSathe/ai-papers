@@ -22,7 +22,7 @@ class Config:
     log_path = 'logs/'
     # Assume COCO data is structured like: data_path/train2017 and data_path/annotations/captions_train2017.json
     # Adjust these paths based on where you downloaded the COCO dataset relative to your project root
-    data_path = './annotations_trainval2017/' # Base path containing annotations dir
+    data_path = './' # Base path containing annotations dir
     image_dir_relative_to_data_path = '../train2017/train2017' # Relative path to images from data_path (adjust if needed)
     caption_file = 'annotations/captions_train2017.json' # Relative path to annotation json within data_path
     vocab_path = './vocab.pkl' # Path to load vocabulary

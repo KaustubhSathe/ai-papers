@@ -114,7 +114,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Default paths assume a 'data/coco/annotations' structure, adjust as needed
     parser.add_argument('--caption_path', type=str,
-                        default='./annotations_trainval2017/annotations/captions_train2017.json',
+                        default='./annotations/captions_train2017.json',
                         help='Path for train annotation file.')
     parser.add_argument('--vocab_path', type=str, default='./vocab.pkl',
                         help='Path for saving vocabulary wrapper.')
