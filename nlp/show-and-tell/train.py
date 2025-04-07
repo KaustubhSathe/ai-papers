@@ -351,7 +351,7 @@ def main(config):
             optimizer.step()
 
             # --- Changed: Log uses 1-based epoch and step ---
-            print(f'E[{epoch+1}/{config.num_epochs}] S[{step}/{total_steps}] Loss: {loss.item():.4f}') # Optional: Comment out if too verbose
+            # print(f'E[{epoch+1}/{config.num_epochs}] S[{step}/{total_steps}] Loss: {loss.item():.4f}') # Optional: Comment out if too verbose
             # --- End Changed Log ---
 
 
