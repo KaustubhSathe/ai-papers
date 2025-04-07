@@ -22,63 +22,45 @@ def load_image(image_path, transform=None):
     return image
 
 def generate_caption(encoder, decoder, image_tensor, vocab, max_length=50):
-    """Generate a caption for an image using greedy search."""
+    """Generate a caption for an image using the decoder's sample method."""
     encoder.eval()  # Set encoder to evaluation mode
     decoder.eval()  # Set decoder to evaluation mode
 
     image_tensor = image_tensor.to(device)
 
     with torch.no_grad(): # Inference doesn't need gradients
-        features = encoder(image_tensor)
-        # Start with <start> token
-        inputs = torch.tensor([vocab(vocab.word2idx['<start>'])], dtype=torch.long).unsqueeze(0).to(device) # (1, 1)
-        # Hidden state initialization (use decoder's method if available, otherwise zeros)
-        # Assuming decoder has init_hidden method or similar, adapt if necessary
-        # hidden = decoder.init_hidden(1) # Batch size 1
-        # If no init_hidden, initialize manually:
-        # hidden = (torch.zeros(decoder.num_layers, 1, decoder.hidden_size).to(device),
-        #           torch.zeros(decoder.num_layers, 1, decoder.hidden_size).to(device))
+        features = encoder(image_tensor) # (1, embed_size)
 
+        # --- Use decoder.sample method --- 
+        # The sample method handles the generation loop internally
+        # Ensure the sample method exists and handles potential <end> token index
+        if hasattr(decoder, 'sample') and callable(getattr(decoder, 'sample')):
+            # Pass features (expected shape typically (1, embed_size))
+            sampled_ids_tensor = decoder.sample(features) # Returns tensor shape (1, sequence_length)
+            
+            # Check if the output is a tensor and flatten if necessary
+            if isinstance(sampled_ids_tensor, torch.Tensor):
+                 sampled_ids = sampled_ids_tensor.cpu().numpy().flatten().tolist()
+            else:
+                 # Handle cases where sample might return list or other types directly (less common)
+                 print("Warning: decoder.sample did not return a tensor. Attempting to process directly.")
+                 sampled_ids = list(sampled_ids_tensor)
 
-        sampled_ids = []
-        # Initial state for LSTM: (h_0, c_0)
-        # Get batch size from features (should be 1)
-        batch_size_feat = features.size(0)
-        states = None # Initialize LSTM state
+        else:
+             print("Error: Decoder object does not have a 'sample' method. Cannot generate caption.")
+             return "[Error: sample method missing in DecoderRNN]"
+        # --- End Use decoder.sample method ---
 
-        for i in range(max_length):
-            # The decoder takes features, inputs (current word), and lengths
-            # For single step inference, length is always 1
-            step_length = torch.tensor([1], dtype=torch.long).cpu() # Length is 1 for single word input
-            outputs, states = decoder(features, inputs, step_length, states) # outputs: (1, vocab_size), states: (h_n, c_n)
-
-            # outputs shape might be (batch=1, seq_len=1, vocab_size) if batch_first=True
-            # Need to squeeze if necessary before finding the max probability word
-            if outputs.dim() == 3 and outputs.size(1) == 1:
-                outputs = outputs.squeeze(1) # Shape: (1, vocab_size)
-
-
-            predicted = outputs.argmax(1) # Get the index of the max probability word -> shape (1)
-
-            # Append the predicted word index
-            predicted_item = predicted.item()
-            sampled_ids.append(predicted_item)
-
-            # Prepare the predicted word as the input for the next step
-            inputs = predicted.unsqueeze(1) # -> shape (1, 1)
-
-            # Stop if <end> token is generated
-            if predicted_item == vocab(vocab.word2idx['<end>']):
-                break
 
     # Convert indices to words
-    caption_words = [vocab.idx2word[idx] for idx in sampled_ids]
+    caption_words = [vocab.idx2word[idx] for idx in sampled_ids if idx in vocab.idx2word] # Add check for idx validity
 
     # Filter out special tokens for the final sentence
     caption = []
     for word in caption_words:
         if word == '<start>':
             continue
+        # The sample method might or might not include <end>, handle it here
         if word == '<end>':
             break
         caption.append(word)
